@@ -27,15 +27,21 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import org.apache.commons.io.FileUtils;
+
+import java.io.File;
+import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+
 
 import permissions.dispatcher.NeedsPermission;
 import permissions.dispatcher.RuntimePermissions;
@@ -44,10 +50,11 @@ import permissions.dispatcher.RuntimePermissions;
 public class MapDemoActivity extends AppCompatActivity implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        LocationListener, GoogleMap.OnMapLongClickListener {
+        LocationListener, GoogleMap.OnMapLongClickListener, GoogleMap.OnCameraChangeListener {
     private LatLng currentlyPossision;
+    private ArrayList<String> strPoliceList;
+    private ArrayList<Police> policeList;
     private List<LatLng> policeLocation;
-    private Context context;
     private SupportMapFragment mapFragment;
     private GoogleMap map;
     private GoogleApiClient mGoogleApiClient;
@@ -61,13 +68,19 @@ public class MapDemoActivity extends AppCompatActivity implements
      */
     private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
 
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.map_demo_activity);
+        policeList = new ArrayList<>();
+        readFile();
+
+        if (strPoliceList != null) {
+            convertStringtoObject(strPoliceList);
+        }
         currentlyPossision = new LatLng(0, 0);
         policeLocation = new ArrayList<>();
-        context = this;
         mapFragment = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map));
         if (mapFragment != null) {
             mapFragment.getMapAsync(new OnMapReadyCallback() {
@@ -79,7 +92,15 @@ public class MapDemoActivity extends AppCompatActivity implements
         } else {
             Toast.makeText(this, "Error - Map Fragment was null!!", Toast.LENGTH_SHORT).show();
         }
+    }
 
+    public void convertStringtoObject(ArrayList<String> police) {
+        for (int i = 0; i < police.size(); i++) {
+            if (police.get(i) != null && !police.get(i).equals("")) {
+                String[] info = police.get(i).split(":");
+                policeList.add(new Police(new LatLng(Double.valueOf(info[0]), Double.valueOf(info[1])), Long.valueOf(info[2])));
+            }
+        }
     }
 
     protected void loadMap(GoogleMap googleMap) {
@@ -88,9 +109,31 @@ public class MapDemoActivity extends AppCompatActivity implements
             // Map is ready
             Toast.makeText(this, "Map Fragment was loaded properly!", Toast.LENGTH_SHORT).show();
             MapDemoActivityPermissionsDispatcher.getMyLocationWithCheck(this);
+            loadPolice();
             map.setOnMapLongClickListener(this);
+
+
+            // setUpClusterer();
         } else {
             Toast.makeText(this, "Error - Map was null!!", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void loadPolice() {
+        if (policeList != null) {
+            BitmapDescriptor defaultMarker = BitmapDescriptorFactory
+                    .defaultMarker(BitmapDescriptorFactory.HUE_RED);
+            for (int i = 0; i < policeList.size(); i++) {
+                if (Police.getTimeAgo(policeList.get(i).getTimeInLong()).contains("days")) {
+                    defaultMarker = BitmapDescriptorFactory
+                            .defaultMarker(BitmapDescriptorFactory.HUE_YELLOW);
+                }
+                Marker marker = map.addMarker(new MarkerOptions().position(policeList.get(i).getLoc())
+                        .icon(defaultMarker).title("Police").
+                                snippet("Seen " + Police.getTimeAgo(policeList
+                                        .get(i).getTimeInLong())));
+                dropPinEffect(marker);
+            }
         }
     }
 
@@ -151,7 +194,7 @@ public class MapDemoActivity extends AppCompatActivity implements
 
             case CONNECTION_FAILURE_RESOLUTION_REQUEST:
             /*
-			 * If the result code is Activity.RESULT_OK, try to connect again
+             * If the result code is Activity.RESULT_OK, try to connect again
 			 */
                 switch (resultCode) {
                     case Activity.RESULT_OK:
@@ -244,8 +287,8 @@ public class MapDemoActivity extends AppCompatActivity implements
      */
     @Override
     public void onConnectionFailed(ConnectionResult connectionResult) {
-		/*
-		 * Google Play services can resolve some errors it detects. If the error
+        /*
+         * Google Play services can resolve some errors it detects. If the error
 		 * has a resolution, try sending an Intent to start a Google Play
 		 * services activity that can resolve error.
 		 */
@@ -254,8 +297,8 @@ public class MapDemoActivity extends AppCompatActivity implements
                 // Start an Activity that tries to resolve the error
                 connectionResult.startResolutionForResult(this,
                         CONNECTION_FAILURE_RESOLUTION_REQUEST);
-				/*
-				 * Thrown if Google Play services canceled the original
+                /*
+                 * Thrown if Google Play services canceled the original
 				 * PendingIntent
 				 */
             } catch (IntentSender.SendIntentException e) {
@@ -270,25 +313,27 @@ public class MapDemoActivity extends AppCompatActivity implements
 
     @Override
     public void onMapLongClick(LatLng latLng) {
-        Toast.makeText(this, "An F-22 will shoot your ass at " + currentlyPossision.toString() + ", son", Toast.LENGTH_SHORT).show();
         BitmapDescriptor defaultMarker = BitmapDescriptorFactory
                 .defaultMarker(BitmapDescriptorFactory.HUE_RED);
         DateFormat dateformat = new SimpleDateFormat("HH:mm");
         Date date = new Date();
-
         Marker marker = map.addMarker(new MarkerOptions().position(currentlyPossision)
-                .icon(defaultMarker).title("Police here").snippet("Seen at: "+dateformat.format(date)));
+                .icon(defaultMarker).title("Police here").snippet("Seen " + Police.getTimeAgo(Police.getDateInMillis(date))));
         dropPinEffect(marker);
-        if (!policeLocation.contains(currentlyPossision)) {
-            policeLocation.add(currentlyPossision);
-        }
-        for (LatLng position : policeLocation
-                ) {
-
-            Log.d("Locations", position.toString());
-
+        if (!isExis(latLng)) {
+            policeList.add(new Police(currentlyPossision));
+            writeFile(new Police(currentlyPossision));
         }
 
+    }
+
+    private boolean isExis(LatLng latLng) {
+        for (int i = 0; i < policeList.size(); i++) {
+            if (policeList.get(i).getLoc().equals(latLng)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void dropPinEffect(final Marker marker) {
@@ -323,6 +368,12 @@ public class MapDemoActivity extends AppCompatActivity implements
         });
     }
 
+    @Override
+    public void onCameraChange(CameraPosition cameraPosition) {
+
+    }
+
+
     // Define a DialogFragment that displays the error dialog
     public static class ErrorDialogFragment extends DialogFragment {
 
@@ -347,4 +398,25 @@ public class MapDemoActivity extends AppCompatActivity implements
         }
     }
 
+    public void readFile() {
+        File filedir = getFilesDir();
+        File policeFile = new File(filedir, "Police.txt");
+        try {
+            strPoliceList = new ArrayList<String>(FileUtils.readLines(policeFile));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void writeFile(Police police) {
+        File filedir = getFilesDir();
+        File policeFile = new File(filedir, "Police.txt");
+        try {
+            if (police.getLoc().latitude != 0 || police.getLoc().longitude != 0) {
+                FileUtils.write(policeFile, "\n" + police.toString(), true);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
