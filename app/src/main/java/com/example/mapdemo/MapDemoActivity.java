@@ -2,7 +2,6 @@ package com.example.mapdemo;
 
 import android.app.Activity;
 import android.app.Dialog;
-import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.location.Location;
@@ -14,6 +13,12 @@ import android.util.Log;
 import android.view.animation.BounceInterpolator;
 import android.widget.Toast;
 
+import com.firebase.client.ChildEventListener;
+import com.firebase.client.DataSnapshot;
+import com.firebase.client.Firebase;
+import com.firebase.client.FirebaseError;
+import com.firebase.client.Query;
+import com.firebase.client.ValueEventListener;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -42,7 +47,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-
 import permissions.dispatcher.NeedsPermission;
 import permissions.dispatcher.RuntimePermissions;
 
@@ -51,7 +55,13 @@ public class MapDemoActivity extends AppCompatActivity implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
         LocationListener, GoogleMap.OnMapLongClickListener, GoogleMap.OnCameraChangeListener {
+    /*
+     * Define a request code to send to Google Play services This code is
+     * returned in Activity.onActivityResult
+     */
+    private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
     private LatLng currentlyPossision;
+    private int currentId;
     private ArrayList<String> strPoliceList;
     private ArrayList<Police> policeList;
     private List<LatLng> policeLocation;
@@ -61,24 +71,24 @@ public class MapDemoActivity extends AppCompatActivity implements
     private LocationRequest mLocationRequest;
     private long UPDATE_INTERVAL = 60000;  /* 60 secs */
     private long FASTEST_INTERVAL = 5000; /* 5 secs */
-
-    /*
-     * Define a request code to send to Google Play services This code is
-     * returned in Activity.onActivityResult
-     */
-    private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
-
+    private Firebase dtb;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.map_demo_activity);
-        policeList = new ArrayList<>();
-        readFile();
 
-        if (strPoliceList != null) {
-            convertStringtoObject(strPoliceList);
-        }
+        Firebase.setAndroidContext(this);
+        dtb = new Firebase(Config.FIREBASE_URL);
+        policeList = new ArrayList<>();
+
+        readDatabase();
+//                readFile();
+//
+//        if (strPoliceList != null) {
+//            convertStringtoObject(strPoliceList);
+//        }
+
         currentlyPossision = new LatLng(0, 0);
         policeLocation = new ArrayList<>();
         mapFragment = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map));
@@ -98,7 +108,9 @@ public class MapDemoActivity extends AppCompatActivity implements
         for (int i = 0; i < police.size(); i++) {
             if (police.get(i) != null && !police.get(i).equals("")) {
                 String[] info = police.get(i).split(":");
-                policeList.add(new Police(new LatLng(Double.valueOf(info[0]), Double.valueOf(info[1])), Long.valueOf(info[2])));
+                Police temp = new Police(new LatLng(Double.valueOf(info[0]), Double.valueOf(info[1])), Long.valueOf(info[2]));
+                dtb.child("Police " + i + 1).setValue(temp);
+                policeList.add(temp);
             }
         }
     }
@@ -109,7 +121,7 @@ public class MapDemoActivity extends AppCompatActivity implements
             // Map is ready
             Toast.makeText(this, "Map Fragment was loaded properly!", Toast.LENGTH_SHORT).show();
             MapDemoActivityPermissionsDispatcher.getMyLocationWithCheck(this);
-            loadPolice();
+//            loadPolice();
             map.setOnMapLongClickListener(this);
 
 
@@ -119,23 +131,23 @@ public class MapDemoActivity extends AppCompatActivity implements
         }
     }
 
-    private void loadPolice() {
-        if (policeList != null) {
-            BitmapDescriptor defaultMarker = BitmapDescriptorFactory
-                    .defaultMarker(BitmapDescriptorFactory.HUE_RED);
-            for (int i = 0; i < policeList.size(); i++) {
-                if (Police.getTimeAgo(policeList.get(i).getTimeInLong()).contains("days")) {
-                    defaultMarker = BitmapDescriptorFactory
-                            .defaultMarker(BitmapDescriptorFactory.HUE_YELLOW);
-                }
-                Marker marker = map.addMarker(new MarkerOptions().position(policeList.get(i).getLoc())
-                        .icon(defaultMarker).title("Police").
-                                snippet("Seen " + Police.getTimeAgo(policeList
-                                        .get(i).getTimeInLong())));
-                dropPinEffect(marker);
-            }
-        }
-    }
+//    private void loadPolice() {
+//        if (policeList != null) {
+//            BitmapDescriptor defaultMarker = BitmapDescriptorFactory
+//                    .defaultMarker(BitmapDescriptorFactory.HUE_RED);
+//            for (int i = 0; i < policeList.size(); i++) {
+//                if (Police.getTimeAgo(policeList.get(i).getTimeInLong()).contains("days")) {
+//                    defaultMarker = BitmapDescriptorFactory
+//                            .defaultMarker(BitmapDescriptorFactory.HUE_YELLOW);
+//                }
+//                Marker marker = map.addMarker(new MarkerOptions().position(new LatLng(policeList.get(i).getLatitude(), policeList.get(i).getLongitude()))
+//                        .icon(defaultMarker).title("Police").
+//                                snippet("Seen " + Police.getTimeAgo(policeList
+//                                        .get(i).getTimeInLong())));
+//                dropPinEffect(marker);
+//            }
+//        }
+//    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
@@ -313,23 +325,23 @@ public class MapDemoActivity extends AppCompatActivity implements
 
     @Override
     public void onMapLongClick(LatLng latLng) {
+        Police police = new Police(currentlyPossision);
+        police.setId(currentId+1);
+        dropMarker(police);
+        writeToCloud(police);
+    }
+
+    public void dropMarker(Police police){
         BitmapDescriptor defaultMarker = BitmapDescriptorFactory
                 .defaultMarker(BitmapDescriptorFactory.HUE_RED);
-        DateFormat dateformat = new SimpleDateFormat("HH:mm");
-        Date date = new Date();
-        Marker marker = map.addMarker(new MarkerOptions().position(currentlyPossision)
-                .icon(defaultMarker).title("Police here").snippet("Seen " + Police.getTimeAgo(Police.getDateInMillis(date))));
+        Marker marker = map.addMarker(new MarkerOptions().position(new LatLng(police.getLatitude(),police.getLongitude()))
+                .icon(defaultMarker).title("Police here").snippet("Seen " + Police.getTimeAgo(police.getTimeInLong())));
         dropPinEffect(marker);
-        if (!isExis(latLng)) {
-            policeList.add(new Police(currentlyPossision));
-            writeFile(new Police(currentlyPossision));
-        }
-
     }
 
     private boolean isExis(LatLng latLng) {
         for (int i = 0; i < policeList.size(); i++) {
-            if (policeList.get(i).getLoc().equals(latLng)) {
+            if (new LatLng(policeList.get(i).getLatitude(), policeList.get(i).getLongitude()).equals(latLng)) {
                 return true;
             }
         }
@@ -373,6 +385,64 @@ public class MapDemoActivity extends AppCompatActivity implements
 
     }
 
+    public void readFile() {
+        File filedir = getFilesDir();
+        File policeFile = new File(filedir, "Police.txt");
+        try {
+            strPoliceList = new ArrayList<String>(FileUtils.readLines(policeFile));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void readDatabase() {
+        Query query = dtb.orderByChild("id");
+        query.addChildEventListener(new ChildEventListener() {
+            @Override
+            public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+                Police police = dataSnapshot.getValue(Police.class);
+                currentId = police.getId();
+                dropMarker(police);
+
+            }
+
+            @Override
+            public void onChildChanged(DataSnapshot dataSnapshot, String s) {
+
+            }
+
+            @Override
+            public void onChildRemoved(DataSnapshot dataSnapshot) {
+
+            }
+
+            @Override
+            public void onChildMoved(DataSnapshot dataSnapshot, String s) {
+
+            }
+
+            @Override
+            public void onCancelled(FirebaseError firebaseError) {
+
+            }
+        });
+    }
+
+    public void writeToCloud(Police police) {
+        dtb.child("Police " + police.getId()).setValue(police);
+    }
+
+    public void writeFile(Police police) {
+        File filedir = getFilesDir();
+        File policeFile = new File(filedir, "Police.txt");
+        try {
+            if (police.getLatitude() != 0 || police.getLongitude() != 0) {
+                FileUtils.write(policeFile, "\n" + police.toString(), true);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     // Define a DialogFragment that displays the error dialog
     public static class ErrorDialogFragment extends DialogFragment {
@@ -395,28 +465,6 @@ public class MapDemoActivity extends AppCompatActivity implements
         @Override
         public Dialog onCreateDialog(Bundle savedInstanceState) {
             return mDialog;
-        }
-    }
-
-    public void readFile() {
-        File filedir = getFilesDir();
-        File policeFile = new File(filedir, "Police.txt");
-        try {
-            strPoliceList = new ArrayList<String>(FileUtils.readLines(policeFile));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void writeFile(Police police) {
-        File filedir = getFilesDir();
-        File policeFile = new File(filedir, "Police.txt");
-        try {
-            if (police.getLoc().latitude != 0 || police.getLoc().longitude != 0) {
-                FileUtils.write(policeFile, "\n" + police.toString(), true);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 }

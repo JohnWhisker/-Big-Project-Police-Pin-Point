@@ -30,16 +30,13 @@ public class ClusterManager<T extends ClusterItem & com.google.maps.android.clus
     private final MarkerManager mMarkerManager;
     private final MarkerManager.Collection mMarkers;
     private final MarkerManager.Collection mClusterMarkers;
-
-    private Algorithm<T> mAlgorithm;
     private final ReadWriteLock mAlgorithmLock = new ReentrantReadWriteLock();
+    private final ReadWriteLock mClusterTaskLock = new ReentrantReadWriteLock();
+    private Algorithm<T> mAlgorithm;
     private ClusterRenderer<T> mRenderer;
-
     private GoogleMap mMap;
     private CameraPosition mPreviousCameraPosition;
     private ClusterTask mClusterTask;
-    private final ReadWriteLock mClusterTaskLock = new ReentrantReadWriteLock();
-
     private OnClusterItemClickListener<T> mOnClusterItemClickListener;
     private OnClusterInfoWindowClickListener<T> mOnClusterInfoWindowClickListener;
     private OnClusterItemInfoWindowClickListener<T> mOnClusterItemInfoWindowClickListener;
@@ -50,7 +47,7 @@ public class ClusterManager<T extends ClusterItem & com.google.maps.android.clus
     }
 
     public ClusterManager(Context context, GoogleMap map, MarkerManager markerManager) {
-        super(context,map,markerManager);
+        super(context, map, markerManager);
         mMap = map;
         mMarkerManager = markerManager;
         mClusterMarkers = markerManager.newCollection();
@@ -189,26 +186,6 @@ public class ClusterManager<T extends ClusterItem & com.google.maps.android.clus
     }
 
     /**
-     * Runs the clustering algorithm in a background thread, then re-paints when results come back.
-     */
-    private class ClusterTask extends AsyncTask<Float, Void, Set<? extends Cluster<T>>> {
-        @Override
-        protected Set<? extends Cluster<T>> doInBackground(Float... zoom) {
-            mAlgorithmLock.readLock().lock();
-            try {
-                return mAlgorithm.getClusters(zoom[0]);
-            } finally {
-                mAlgorithmLock.readLock().unlock();
-            }
-        }
-
-        @Override
-        protected void onPostExecute(Set<? extends Cluster<T>> clusters) {
-            mRenderer.onClustersChanged(clusters);
-        }
-    }
-
-    /**
      * Sets a callback that's invoked when a Cluster is tapped. Note: For this listener to function,
      * the ClusterManager must be added as a click listener to the map.
      */
@@ -270,6 +247,26 @@ public class ClusterManager<T extends ClusterItem & com.google.maps.android.clus
      */
     public interface OnClusterItemInfoWindowClickListener<T extends ClusterItem> {
         public void onClusterItemInfoWindowClick(T item);
+    }
+
+    /**
+     * Runs the clustering algorithm in a background thread, then re-paints when results come back.
+     */
+    private class ClusterTask extends AsyncTask<Float, Void, Set<? extends Cluster<T>>> {
+        @Override
+        protected Set<? extends Cluster<T>> doInBackground(Float... zoom) {
+            mAlgorithmLock.readLock().lock();
+            try {
+                return mAlgorithm.getClusters(zoom[0]);
+            } finally {
+                mAlgorithmLock.readLock().unlock();
+            }
+        }
+
+        @Override
+        protected void onPostExecute(Set<? extends Cluster<T>> clusters) {
+            mRenderer.onClustersChanged(clusters);
+        }
     }
 }
 
