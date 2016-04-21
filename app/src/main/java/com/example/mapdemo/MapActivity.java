@@ -42,6 +42,7 @@ import org.apache.commons.io.FileUtils;
 import java.io.File;
 import java.io.IOException;
 import java.text.DateFormat;
+import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -51,7 +52,7 @@ import permissions.dispatcher.NeedsPermission;
 import permissions.dispatcher.RuntimePermissions;
 
 @RuntimePermissions
-public class MapDemoActivity extends AppCompatActivity implements
+public class MapActivity extends AppCompatActivity implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
         LocationListener, GoogleMap.OnMapLongClickListener, GoogleMap.OnCameraChangeListener {
@@ -62,9 +63,7 @@ public class MapDemoActivity extends AppCompatActivity implements
     private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
     private LatLng currentlyPossision;
     private int currentId;
-    private ArrayList<String> strPoliceList;
     private ArrayList<Police> policeList;
-    private List<LatLng> policeLocation;
     private SupportMapFragment mapFragment;
     private GoogleMap map;
     private GoogleApiClient mGoogleApiClient;
@@ -77,20 +76,11 @@ public class MapDemoActivity extends AppCompatActivity implements
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.map_demo_activity);
-
         Firebase.setAndroidContext(this);
         dtb = new Firebase(Config.FIREBASE_URL);
         policeList = new ArrayList<>();
-
         readDatabase();
-//                readFile();
-//
-//        if (strPoliceList != null) {
-//            convertStringtoObject(strPoliceList);
-//        }
-
-        currentlyPossision = new LatLng(0, 0);
-        policeLocation = new ArrayList<>();
+        currentlyPossision = new LatLng(0,0);
         mapFragment = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map));
         if (mapFragment != null) {
             mapFragment.getMapAsync(new OnMapReadyCallback() {
@@ -104,23 +94,75 @@ public class MapDemoActivity extends AppCompatActivity implements
         }
     }
 
-    public void convertStringtoObject(ArrayList<String> police) {
-        for (int i = 0; i < police.size(); i++) {
-            if (police.get(i) != null && !police.get(i).equals("")) {
-                String[] info = police.get(i).split(":");
-                Police temp = new Police(new LatLng(Double.valueOf(info[0]), Double.valueOf(info[1])), Long.valueOf(info[2]));
-                dtb.child("Police " + i + 1).setValue(temp);
-                policeList.add(temp);
+    public void groupPolice(){
+        for(int i=0;i<policeList.size();i++){
+            for(int j=0;j<policeList.size();j++){
+                Police police1 = policeList.get(i);
+                Police police2 = policeList.get(j);
+                long distance = Math.round(CalculationByDistance(
+                        new LatLng(police1.getLatitude(),police1.getLongitude()),
+                        new LatLng(police2.getLatitude(),police2.getLongitude())
+                ));
+                if(distance<30){
+                    double newlat,newlong;
+                    newlat = (police1.getLatitude()+police2.getLatitude())/2;
+                    newlong = (police1.getLongitude()+police2.getLongitude())/2;
+                    police1.setLatitude(newlat);
+                    police1.setLongitude(newlong);
+                    dtb.child("Police "+police1.getId()).setValue(police1);
+                    dtb.child("Police "+police2.getId()).removeValue();
+                }
+
             }
         }
     }
+    public double CalculationByDistance(LatLng StartP, LatLng EndP) {
+        int Radius = 6371;// radius of earth in Km
+        double lat1 = StartP.latitude;
+        double lat2 = EndP.latitude;
+        double lon1 = StartP.longitude;
+        double lon2 = EndP.longitude;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1))
+                * Math.cos(Math.toRadians(lat2)) * Math.sin(dLon / 2)
+                * Math.sin(dLon / 2);
+        double c = 2 * Math.asin(Math.sqrt(a));
+        double valueResult = Radius * c;
+        double km = valueResult / 1;
+        DecimalFormat newFormat = new DecimalFormat("####");
+        int kmInDec = Integer.valueOf(newFormat.format(km));
+        double meter = valueResult % 1000;
+        int meterInDec = Integer.valueOf(newFormat.format(meter));
+        Log.i("Radius Value", "" + valueResult + "   KM  " + kmInDec
+                + " Meter   " + meterInDec);
 
+        return Radius * c;
+    }
+    public boolean useCurrent(LatLng clickPos){
+        long distanceInMeter = Math.round(CalculationByDistance(currentlyPossision,clickPos)*1000);
+        if(distanceInMeter>80){
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
     protected void loadMap(GoogleMap googleMap) {
         map = googleMap;
         if (map != null) {
             // Map is ready
             Toast.makeText(this, "Map Fragment was loaded properly!", Toast.LENGTH_SHORT).show();
-            MapDemoActivityPermissionsDispatcher.getMyLocationWithCheck(this);
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(10.7739918,106.7013283),17));
+            CameraPosition cameraPosition = new CameraPosition.Builder()
+                    .target(new LatLng(10.7739918,106.7013283))
+                    .zoom(11)
+                    .bearing(90)
+                    .tilt(0)
+                    .build();
+            map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+            MapActivityPermissionsDispatcher.getMyLocationWithCheck(this);
 //            loadPolice();
             map.setOnMapLongClickListener(this);
 
@@ -152,7 +194,7 @@ public class MapDemoActivity extends AppCompatActivity implements
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        MapDemoActivityPermissionsDispatcher.onRequestPermissionsResult(this, requestCode, grantResults);
+        MapActivityPermissionsDispatcher.onRequestPermissionsResult(this, requestCode, grantResults);
     }
 
     @NeedsPermission({Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION})
@@ -325,10 +367,16 @@ public class MapDemoActivity extends AppCompatActivity implements
 
     @Override
     public void onMapLongClick(LatLng latLng) {
-        Police police = new Police(currentlyPossision);
-        police.setId(currentId+1);
-        dropMarker(police);
-        writeToCloud(police);
+        Police police;
+        if(useCurrent(latLng)) {
+           police = new Police(currentlyPossision);
+        }
+        else{
+           police = new Police(latLng);
+        }
+         police.setId(currentId+1);
+         writeToCloud(police);
+
     }
 
     public void dropMarker(Police police){
@@ -385,25 +433,15 @@ public class MapDemoActivity extends AppCompatActivity implements
 
     }
 
-    public void readFile() {
-        File filedir = getFilesDir();
-        File policeFile = new File(filedir, "Police.txt");
-        try {
-            strPoliceList = new ArrayList<String>(FileUtils.readLines(policeFile));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     public void readDatabase() {
         Query query = dtb.orderByChild("id");
         query.addChildEventListener(new ChildEventListener() {
             @Override
             public void onChildAdded(DataSnapshot dataSnapshot, String s) {
                 Police police = dataSnapshot.getValue(Police.class);
+                policeList.add(police);
                 currentId = police.getId();
                 dropMarker(police);
-
             }
 
             @Override
@@ -432,18 +470,6 @@ public class MapDemoActivity extends AppCompatActivity implements
         dtb.child("Police " + police.getId()).setValue(police);
     }
 
-    public void writeFile(Police police) {
-        File filedir = getFilesDir();
-        File policeFile = new File(filedir, "Police.txt");
-        try {
-            if (police.getLatitude() != 0 || police.getLongitude() != 0) {
-                FileUtils.write(policeFile, "\n" + police.toString(), true);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     // Define a DialogFragment that displays the error dialog
     public static class ErrorDialogFragment extends DialogFragment {
 
@@ -467,4 +493,5 @@ public class MapDemoActivity extends AppCompatActivity implements
             return mDialog;
         }
     }
+
 }
