@@ -4,6 +4,7 @@ import android.util.Log;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.maps.android.clustering.ClusterItem;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -12,7 +13,7 @@ import java.util.Date;
 /**
  * Created by JohnWhisker on 4/11/16.
  */
-public class Police {
+public class Police implements ClusterItem {
     @JsonIgnoreProperties(ignoreUnknown = true)
 
     private static final int SECOND_MILLIS = 1000;
@@ -44,6 +45,11 @@ public class Police {
         this.latitude = loc.latitude;
         this.timeInLong = time;
 
+    }
+
+    @Override
+    public LatLng getPosition() {
+        return new LatLng(latitude, longitude);
     }
 
     public static long getDateInMillis(Date dateinput) {
