@@ -7,7 +7,12 @@ import android.content.IntentSender;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.support.design.widget.TabLayout;
 import android.support.v4.app.DialogFragment;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentPagerAdapter;
+import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.animation.BounceInterpolator;
@@ -39,6 +44,7 @@ import com.google.maps.android.clustering.ClusterManager;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.List;
 
 import permissions.dispatcher.NeedsPermission;
 import permissions.dispatcher.RuntimePermissions;
@@ -56,8 +62,9 @@ public class MapActivity extends AppCompatActivity implements
     private LatLng mCurrentPosition;
     private int currentId;
     private ArrayList<Police> mPoliceList, mRemoveList;
-    private SupportMapFragment mMapFragment;
-    private GoogleMap mMap;
+    private TabLayout mTablayout;
+    private ViewPagerAdapter mAdapter;
+    private ViewPager mViewpager;
     private GoogleApiClient mGoogleApiClient;
     private LocationRequest mLocationRequest;
     private ClusterManager<Police> mClusterManager;
@@ -65,62 +72,84 @@ public class MapActivity extends AppCompatActivity implements
     private long FASTEST_INTERVAL = 5000; /* 5 secs */
     private Firebase mDb;
 
+    public LatLng getmCurrentPosition(){
+        return mCurrentPosition;
+
+    }
+    public ArrayList<Police> getmPoliceList()
+    {
+        return mPoliceList;
+    }
+
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.map_demo_activity);
         Firebase.setAndroidContext(this);
+        setupViewpager();
         mDb = new Firebase(Config.FIREBASE_URL);
         mPoliceList = new ArrayList<>();
         mRemoveList = new ArrayList<>();
         readDatabase();
-
         mCurrentPosition = new LatLng(0, 0); //TODO: Make current position.
-        mMapFragment = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map));
-        if (mMapFragment != null) {
-            mMapFragment.getMapAsync(new OnMapReadyCallback() {
-                @Override
-                public void onMapReady(GoogleMap map) {
-                    loadMap(map);
-                }
-            });
-        } else {
-            Toast.makeText(this, "Error - Map Fragment was null!!", Toast.LENGTH_SHORT).show();
+    }
+
+    private void setupViewpager() {
+        mViewpager = (ViewPager) findViewById(R.id.viewpager);
+        mAdapter = new ViewPagerAdapter(getSupportFragmentManager());
+        mViewpager.setAdapter(mAdapter);
+        mTablayout = (TabLayout) findViewById(R.id.tabs);
+        mTablayout.setupWithViewPager(mViewpager);
+
+    }
+
+    class ViewPagerAdapter extends FragmentPagerAdapter implements MyLocationListener {
+        EasyMode mEasyMode;
+        MapFragmentHolder mMapFragmentHolder;
+
+        public ViewPagerAdapter(FragmentManager fragmentManager) {
+            super(fragmentManager);
+            mEasyMode = new EasyMode();
+            mMapFragmentHolder = new MapFragmentHolder();
+        }
+
+        @Override
+        public void onLocationUpdate(LatLng newPos) {
+            mMapFragmentHolder.onLocationUpdate(newPos);
+            //Later, we can also call mEasyMode.onLocationUpdate(newPos) if we need.
+        }
+
+        @Override
+        public Fragment getItem(int position) {
+            switch (position) {
+                case 0: // Fragment # 0 - This will show FirstFragment
+                    return mEasyMode;
+                case 1: // Fragment # 0 - This will show FirstFragment different title
+                    return mMapFragmentHolder;
+                default:
+                    return null;
+            }
+        }
+
+        @Override
+        public int getCount() {
+            return 2;
+        }
+
+        @Override
+        public CharSequence getPageTitle(int position) {
+            switch (position) {
+                case 0:
+                    return "Easy Mode";
+                case 1:
+                    return "Hard Mode";
+                default:
+                    return null;
+            }
         }
     }
-
-    protected void loadMap(GoogleMap googleMap) {
-        mMap = googleMap;
-        if (mMap != null) {
-            // Map is ready
-            Toast.makeText(this, "Map Fragment was loaded properly!", Toast.LENGTH_SHORT).show();
-            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(10.7739918, 106.7013283), 17));
-            CameraPosition cameraPosition = new CameraPosition.Builder()
-                    .target(new LatLng(10.7739918, 106.7013283))
-                    .zoom(11)
-                    .bearing(90)
-                    .tilt(0)
-                    .build();
-            mMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
-            MapActivityPermissionsDispatcher.getMyLocationWithCheck(this);
-            mMap.setOnMapLongClickListener(this);
-            setUpClusterer();
-        } else {
-            Toast.makeText(this, "Error - Map was null!!", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void setUpClusterer() {
-        // Initialize the manager with the context and the map.
-        // (Activity extends context, so we can pass 'this' in the constructor.)
-        mClusterManager = new ClusterManager<Police>(this, mMap);
-
-        // Point the map's listeners at the listeners implemented by the cluster
-        // manager.
-        mMap.setOnCameraChangeListener(mClusterManager);
-        mMap.setOnMarkerClickListener(mClusterManager);
-    }
-
 
 
     public double CalculationByDistance(LatLng StartP, LatLng EndP) {
@@ -144,12 +173,11 @@ public class MapActivity extends AppCompatActivity implements
         int meterInDec = Integer.valueOf(newFormat.format(meter));
         Log.i("Radius Value", "" + valueResult + "   KM  " + kmInDec
                 + " Meter   " + meterInDec);
-
         return Radius * c;
     }
 
     public boolean useCurrent(LatLng clickPos) {
-        long distanceInMeter = Math.round(CalculationByDistance(mCurrentPosition, clickPos) * 1000);
+        long distanceInMeter = Math.round(CalculationByDistance(mCurrentPosition, clickPos)*1000);
         if (distanceInMeter > 80) {
             return true;
         } else {
@@ -165,15 +193,11 @@ public class MapActivity extends AppCompatActivity implements
 
     @NeedsPermission({Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION})
     void getMyLocation() {
-        if (mMap != null) {
-            // Now that mMap has loaded, let's get our location!
-            mMap.setMyLocationEnabled(true);
-            mGoogleApiClient = new GoogleApiClient.Builder(this)
-                    .addApi(LocationServices.API)
-                    .addConnectionCallbacks(this)
-                    .addOnConnectionFailedListener(this).build();
-            connectClient();
-        }
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addApi(LocationServices.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this).build();
+        connectClient();
     }
 
     protected void connectClient() {
@@ -263,7 +287,7 @@ public class MapActivity extends AppCompatActivity implements
             Toast.makeText(this, "GPS location was found!", Toast.LENGTH_SHORT).show();
             LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
             CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 17);
-            mMap.animateCamera(cameraUpdate);
+
         } else {
             Toast.makeText(this, "Current location was null, enable GPS on emulator!", Toast.LENGTH_SHORT).show();
         }
@@ -286,7 +310,7 @@ public class MapActivity extends AppCompatActivity implements
                 Double.toString(location.getLongitude());
         mCurrentPosition = new LatLng(location.getLatitude(), location.getLongitude());
         //Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
-
+        mAdapter.onLocationUpdate(mCurrentPosition);
     }
 
     /*
@@ -347,14 +371,14 @@ public class MapActivity extends AppCompatActivity implements
 
     }
 
-    public void dropMarker(Police police) {
-        BitmapDescriptor defaultMarker = BitmapDescriptorFactory
-                .defaultMarker(BitmapDescriptorFactory.HUE_RED);
-        Marker marker = mMap.addMarker(new MarkerOptions().position(new LatLng(police.getLatitude(), police.getLongitude()))
-                .icon(defaultMarker).title("Police here").snippet("Seen " + Police.getTimeAgo(police.getTimeInLong())));
-
-        dropPinEffect(marker);
-    }
+//    public void dropMarker(Police police) {
+//        BitmapDescriptor defaultMarker = BitmapDescriptorFactory
+//                .defaultMarker(BitmapDescriptorFactory.HUE_RED);
+//        Marker marker = mMap.addMarker(new MarkerOptions().position(new LatLng(police.getLatitude(), police.getLongitude()))
+//                .icon(defaultMarker).title("Police here").snippet("Seen " + Police.getTimeAgo(police.getTimeInLong())));
+//
+//        dropPinEffect(marker);
+//    }
 
     private boolean isExis(LatLng latLng) {
         for (int i = 0; i < mPoliceList.size(); i++) {
@@ -418,7 +442,7 @@ public class MapActivity extends AppCompatActivity implements
             @Override
             public void onChildAdded(DataSnapshot dataSnapshot, String s) {
                 Police police = dataSnapshot.getValue(Police.class);
-                mClusterManager.addItem(police);
+//               mClusterManager.addItem(police);
                 currentId = police.getId();
 //                dropMarker(police);
             }
