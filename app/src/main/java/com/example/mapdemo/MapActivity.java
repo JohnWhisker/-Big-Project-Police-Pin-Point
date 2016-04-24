@@ -341,10 +341,9 @@ public class MapActivity extends AppCompatActivity implements
         }
         police.setId(currentId + 1);
         writeToCloud(police);
-        mMap.clear();
-        for (Police po : mPoliceList) {
-            dropMarker(po);
-        }
+        mClusterManager.addItem(police);
+        //dropMarker(police);
+        mClusterManager.cluster();
 
     }
 
@@ -353,6 +352,7 @@ public class MapActivity extends AppCompatActivity implements
                 .defaultMarker(BitmapDescriptorFactory.HUE_RED);
         Marker marker = mMap.addMarker(new MarkerOptions().position(new LatLng(police.getLatitude(), police.getLongitude()))
                 .icon(defaultMarker).title("Police here").snippet("Seen " + Police.getTimeAgo(police.getTimeInLong())));
+
         dropPinEffect(marker);
     }
 
@@ -393,6 +393,7 @@ public class MapActivity extends AppCompatActivity implements
                 } else { // done elapsing, show window
                     marker.showInfoWindow();
                 }
+                mClusterManager.cluster();
             }
         });
     }
@@ -446,7 +447,7 @@ public class MapActivity extends AppCompatActivity implements
     }
 
     public void writeToCloud(Police police) {
-        mDb.child("Police " + police.getId()).setValue(police);
+        mDb.push().setValue(police);
     }
 
     // Define a DialogFragment that displays the error dialog

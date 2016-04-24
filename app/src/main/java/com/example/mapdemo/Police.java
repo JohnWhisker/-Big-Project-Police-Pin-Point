@@ -2,6 +2,7 @@ package com.example.mapdemo;
 
 import android.util.Log;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.maps.android.clustering.ClusterItem;
@@ -47,6 +48,7 @@ public class Police implements ClusterItem {
 
     }
 
+    @JsonIgnore
     @Override
     public LatLng getPosition() {
         return new LatLng(latitude, longitude);
