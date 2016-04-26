@@ -53,7 +53,7 @@ import permissions.dispatcher.RuntimePermissions;
 public class MapActivity extends AppCompatActivity implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        LocationListener, GoogleMap.OnMapLongClickListener, GoogleMap.OnCameraChangeListener {
+        LocationListener, GoogleMap.OnMapLongClickListener, GoogleMap.OnCameraChangeListener, GoogleMap.OnMarkerClickListener {
     /*
      * Define a request code to send to Google Play services This code is
      * returned in Activity.onActivityResult
@@ -92,7 +92,7 @@ public class MapActivity extends AppCompatActivity implements
         mDb = new Firebase(Config.FIREBASE_URL);
         mPoliceList = new ArrayList<>();
         mRemoveList = new ArrayList<>();
-        readDatabase();
+
         mCurrentPosition = new LatLng(0, 0); //TODO: Make current position.
     }
 
@@ -103,6 +103,11 @@ public class MapActivity extends AppCompatActivity implements
         mTablayout = (TabLayout) findViewById(R.id.tabs);
         mTablayout.setupWithViewPager(mViewpager);
 
+    }
+
+    @Override
+    public boolean onMarkerClick(Marker marker) {
+        return false;
     }
 
     class ViewPagerAdapter extends FragmentPagerAdapter implements MyLocationListener {
@@ -120,7 +125,22 @@ public class MapActivity extends AppCompatActivity implements
             mMapFragmentHolder.onLocationUpdate(newPos);
             //Later, we can also call mEasyMode.onLocationUpdate(newPos) if we need.
         }
+        public void writeToCloud(Police police) {
+            mMapFragmentHolder.writeToCloud(police);
+        }
+        public void onMapLongClick(LatLng latLng)
+        {
+            mMapFragmentHolder.onMapLongClick(latLng);
+        }
+        public void setUpClusterer()
+        {
+            mMapFragmentHolder.setUpClusterer();
+        }
+        public void onLocationChanged(Location location)
+        {
+            mMapFragmentHolder.onLocationChanged(location);
 
+        }
         @Override
         public Fragment getItem(int position) {
             switch (position) {
@@ -175,16 +195,6 @@ public class MapActivity extends AppCompatActivity implements
                 + " Meter   " + meterInDec);
         return Radius * c;
     }
-
-    public boolean useCurrent(LatLng clickPos) {
-        long distanceInMeter = Math.round(CalculationByDistance(mCurrentPosition, clickPos)*1000);
-        if (distanceInMeter > 80) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -355,31 +365,9 @@ public class MapActivity extends AppCompatActivity implements
         }
     }
 
-    @Override
-    public void onMapLongClick(LatLng latLng) {
-        Police police;
-        if (useCurrent(latLng)) {
-            police = new Police(mCurrentPosition);
-        } else {
-            police = new Police(latLng);
-        }
-        police.setId(currentId + 1);
-        writeToCloud(police);
-        mClusterManager.addItem(police);
-        //dropMarker(police);
-        mClusterManager.cluster();
 
-    }
 
-//    public void dropMarker(Police police) {
-//        BitmapDescriptor defaultMarker = BitmapDescriptorFactory
-//                .defaultMarker(BitmapDescriptorFactory.HUE_RED);
-//        Marker marker = mMap.addMarker(new MarkerOptions().position(new LatLng(police.getLatitude(), police.getLongitude()))
-//                .icon(defaultMarker).title("Police here").snippet("Seen " + Police.getTimeAgo(police.getTimeInLong())));
 //
-//        dropPinEffect(marker);
-//    }
-
     private boolean isExis(LatLng latLng) {
         for (int i = 0; i < mPoliceList.size(); i++) {
             if (new LatLng(mPoliceList.get(i).getLatitude(), mPoliceList.get(i).getLongitude()).equals(latLng)) {
@@ -389,44 +377,21 @@ public class MapActivity extends AppCompatActivity implements
         return false;
     }
 
-    private void dropPinEffect(final Marker marker) {
-        // Handler allows us to repeat a code block after a specified delay
-        final android.os.Handler handler = new android.os.Handler();
-        final long start = SystemClock.uptimeMillis();
-        final long duration = 1500;
 
-        // Use the bounce interpolator
-        final android.view.animation.Interpolator interpolator =
-                new BounceInterpolator();
-
-        // Animate marker with a bounce updating its position every 15ms
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                long elapsed = SystemClock.uptimeMillis() - start;
-                // Calculate t for bounce based on elapsed time
-                float t = Math.max(
-                        1 - interpolator.getInterpolation((float) elapsed
-                                / duration), 0);
-                // Set the anchor
-                marker.setAnchor(0.5f, 1.0f + 14 * t);
-
-                if (t > 0.0) {
-                    // Post this event again 15ms from now.
-                    handler.postDelayed(this, 15);
-                } else { // done elapsing, show window
-                    marker.showInfoWindow();
-                }
-                mClusterManager.cluster();
-            }
-        });
-    }
 
     @Override
     public void onCameraChange(CameraPosition cameraPosition) {
 
     }
+    public void writeToCloud(Police police) {
+        mAdapter.writeToCloud(police);
 
+    }
+    @Override
+    public void onMapLongClick(LatLng latLng) {
+        mAdapter.onMapLongClick(latLng);
+
+    }
     public void writeArrayToCloud() {
         for (Police police : mPoliceList) {
             mDb.child("Police " + police.getId()).setValue(police);
@@ -436,43 +401,8 @@ public class MapActivity extends AppCompatActivity implements
         }
     }
 
-    public void readDatabase() {
-        Query query = mDb.orderByChild("id");
-        query.addChildEventListener(new ChildEventListener() {
-            @Override
-            public void onChildAdded(DataSnapshot dataSnapshot, String s) {
-                Police police = dataSnapshot.getValue(Police.class);
-//               mClusterManager.addItem(police);
-                currentId = police.getId();
-//                dropMarker(police);
-            }
 
 
-            @Override
-            public void onChildChanged(DataSnapshot dataSnapshot, String s) {
-
-            }
-
-            @Override
-            public void onChildRemoved(DataSnapshot dataSnapshot) {
-
-            }
-
-            @Override
-            public void onChildMoved(DataSnapshot dataSnapshot, String s) {
-
-            }
-
-            @Override
-            public void onCancelled(FirebaseError firebaseError) {
-
-            }
-        });
-    }
-
-    public void writeToCloud(Police police) {
-        mDb.push().setValue(police);
-    }
 
     // Define a DialogFragment that displays the error dialog
     public static class ErrorDialogFragment extends DialogFragment {
