@@ -30,7 +30,9 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.maps.android.clustering.Cluster;
 import com.google.maps.android.clustering.ClusterManager;
 
+import java.lang.reflect.Array;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Map;
 
 /**
@@ -42,13 +44,15 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener {
     private GoogleMap mMap;
     private Firebase mDb;
     private ClusterManager<Police> mClusterManager;
+    private LatLng Latlng;
     private LatLng mCurrentPosition;
+    private ArrayList<Police> mPoliceList;
 
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.map_holder_fragment, container, false);
-
+        mPoliceList = new ArrayList<>();
         mDb = new Firebase(Config.FIREBASE_URL);
         readDatabase();
         mCurrentPosition = new LatLng(0, 0);
@@ -105,21 +109,16 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener {
         // manager.
         mMap.setOnCameraChangeListener(mClusterManager);
         //mMap.setOnMarkerClickListener(mClusterManager);
+    mClusterManager.getMarkerCollection().getMarkers();
        mMap.setOnMarkerClickListener((MapActivity) getActivity());
     }
     public void writeToCloud(Police police) {
         mDb.push().setValue(police);
+
     }
     @Override
     public void onLocationUpdate(LatLng newPos) {
         if (mMap != null) {
-            CameraPosition cameraPosition = new CameraPosition.Builder()
-                    .target(newPos)
-                    .zoom(11)
-                    .bearing(90)
-                    .tilt(0)
-                    .build();
-            mMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
             mCurrentPosition =(newPos);
         }
     }
@@ -185,6 +184,7 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener {
         }
         writeToCloud(police);
         mClusterManager.addItem(police);
+            mPoliceList.add(police);
   //      dropMarker(police);
         mClusterManager.cluster();
     }
@@ -226,6 +226,8 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener {
             public void onChildAdded(DataSnapshot dataSnapshot, String s) {
                 Police police = dataSnapshot.getValue(Police.class);
              mClusterManager.addItem(police);
+                mPoliceList.add(police);
+                getPolice(mPoliceList);
                 mClusterManager.cluster();
                 //dropMarker(police);
             }
@@ -252,5 +254,16 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener {
             }
         });
     }
+    public void getPolice(ArrayList<Police> mPoliceList){
+
+    {
+        for(int i = 0;i <mPoliceList.size() ;i++)
+        {
+            mPoliceList.get(i).getPosition();
+            Log.d("Police list","ABC"+mPoliceList);
+        }
+    }
+    }
+
 
 }

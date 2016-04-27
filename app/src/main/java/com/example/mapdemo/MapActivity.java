@@ -61,7 +61,7 @@ public class MapActivity extends AppCompatActivity implements
     private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
     private LatLng mCurrentPosition;
     private int currentId;
-    private ArrayList<Police> mPoliceList, mRemoveList;
+    private ArrayList<Police> mPoliceList;
     private TabLayout mTablayout;
     private ViewPagerAdapter mAdapter;
     private ViewPager mViewpager;
@@ -71,18 +71,11 @@ public class MapActivity extends AppCompatActivity implements
     private long UPDATE_INTERVAL = 60000;  /* 60 secs */
     private long FASTEST_INTERVAL = 5000; /* 5 secs */
     private Firebase mDb;
-
-    public LatLng getmCurrentPosition(){
-        return mCurrentPosition;
-
-    }
-    public ArrayList<Police> getmPoliceList()
+    public LatLng getmCurrentPosition()
     {
-        return mPoliceList;
+
+        return mCurrentPosition;
     }
-
-
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -91,8 +84,6 @@ public class MapActivity extends AppCompatActivity implements
         setupViewpager();
         mDb = new Firebase(Config.FIREBASE_URL);
         mPoliceList = new ArrayList<>();
-        mRemoveList = new ArrayList<>();
-
         mCurrentPosition = new LatLng(0, 0); //TODO: Make current position.
     }
 
@@ -122,7 +113,9 @@ public class MapActivity extends AppCompatActivity implements
 
         @Override
         public void onLocationUpdate(LatLng newPos) {
+
             mMapFragmentHolder.onLocationUpdate(newPos);
+            mEasyMode.onLocationUpdate(newPos);
             //Later, we can also call mEasyMode.onLocationUpdate(newPos) if we need.
         }
         public void writeToCloud(Police police) {
@@ -131,6 +124,7 @@ public class MapActivity extends AppCompatActivity implements
         public void onMapLongClick(LatLng latLng)
         {
             mMapFragmentHolder.onMapLongClick(latLng);
+            Log.d("LATLNG","LATLNG"+latLng);
         }
         public void setUpClusterer()
         {
@@ -141,6 +135,8 @@ public class MapActivity extends AppCompatActivity implements
             mMapFragmentHolder.onLocationChanged(location);
 
         }
+
+
         @Override
         public Fragment getItem(int position) {
             switch (position) {
@@ -169,31 +165,6 @@ public class MapActivity extends AppCompatActivity implements
                     return null;
             }
         }
-    }
-
-
-    public double CalculationByDistance(LatLng StartP, LatLng EndP) {
-        int Radius = 6371;// radius of earth in Km
-        double lat1 = StartP.latitude;
-        double lat2 = EndP.latitude;
-        double lon1 = StartP.longitude;
-        double lon2 = EndP.longitude;
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1))
-                * Math.cos(Math.toRadians(lat2)) * Math.sin(dLon / 2)
-                * Math.sin(dLon / 2);
-        double c = 2 * Math.asin(Math.sqrt(a));
-        double valueResult = Radius * c;
-        double km = valueResult / 1;
-        DecimalFormat newFormat = new DecimalFormat("####");
-        int kmInDec = Integer.valueOf(newFormat.format(km));
-        double meter = valueResult % 1000;
-        int meterInDec = Integer.valueOf(newFormat.format(meter));
-        Log.i("Radius Value", "" + valueResult + "   KM  " + kmInDec
-                + " Meter   " + meterInDec);
-        return Radius * c;
     }
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
@@ -321,6 +292,7 @@ public class MapActivity extends AppCompatActivity implements
         mCurrentPosition = new LatLng(location.getLatitude(), location.getLongitude());
         //Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         mAdapter.onLocationUpdate(mCurrentPosition);
+
     }
 
     /*
@@ -378,7 +350,6 @@ public class MapActivity extends AppCompatActivity implements
     }
 
 
-
     @Override
     public void onCameraChange(CameraPosition cameraPosition) {
 
@@ -392,16 +363,6 @@ public class MapActivity extends AppCompatActivity implements
         mAdapter.onMapLongClick(latLng);
 
     }
-    public void writeArrayToCloud() {
-        for (Police police : mPoliceList) {
-            mDb.child("Police " + police.getId()).setValue(police);
-        }
-        for (Police police : mRemoveList) {
-            mDb.child("Police " + police.getId()).removeValue();
-        }
-    }
-
-
 
 
     // Define a DialogFragment that displays the error dialog

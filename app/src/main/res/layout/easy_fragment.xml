@@ -23,4 +23,13 @@
         android:layout_alignTop="@+id/seePolice"
         android:layout_alignParentStart="true"
         android:layout_marginTop="86dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="300dp"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Large Text"
+        android:id="@+id/textView"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true" />
 </RelativeLayout>
