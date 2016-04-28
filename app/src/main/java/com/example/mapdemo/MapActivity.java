@@ -160,7 +160,7 @@ public class MapActivity extends AppCompatActivity implements
                 case 0:
                     return "Easy Mode";
                 case 1:
-                    return "Hard Mode";
+                    return "Map View";
                 default:
                     return null;
             }
