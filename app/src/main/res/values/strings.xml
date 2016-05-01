@@ -7,4 +7,7 @@
     <color name="yellow_text">#D2E31B</color>
     <color name="red_text">#F22222</color>
     <color name="green_text">#1AC91A</color>
+    <color name="blue_bar">#0066ff</color>
+
+
 </resources>

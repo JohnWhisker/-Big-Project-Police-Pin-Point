@@ -53,15 +53,18 @@ public class EasyMode extends Fragment implements MyLocationListener {
                 if (distance > 1000) {
                     tvDistance.setTextColor(getResources().getColor(R.color.green_text));
                     tvZone.setText("");
+                    tvZone.setVisibility(View.GONE);
                     tvDistance.setText("There're no police nearby");
                 } else {
                     if( distance <100) {
+                        tvZone.setVisibility(View.VISIBLE);
                         tvDistance.setTextColor(getResources().getColor(R.color.red_text));
                         tvZone.setTextColor(getResources().getColor(R.color.red_text));
                         tvZone.setText("KILL ZONE");
                         tvDistance.setText(distance + " meters");
                     }
                     else {
+                        tvZone.setVisibility(View.VISIBLE);
                         tvDistance.setTextColor(getResources().getColor(R.color.yellow_text));
                         tvZone.setTextColor(getResources().getColor(R.color.yellow_text));
                         tvZone.setText("DANGEROUS ZONE\n");
@@ -140,7 +143,8 @@ public class EasyMode extends Fragment implements MyLocationListener {
 
             @Override
             public void onChildRemoved(DataSnapshot dataSnapshot) {
-
+                Police police = dataSnapshot.getValue(Police.class);
+                mPoliceList.remove(police);
             }
 
             @Override
@@ -167,5 +171,6 @@ public class EasyMode extends Fragment implements MyLocationListener {
         return distance;
 
     }
+
 
 }

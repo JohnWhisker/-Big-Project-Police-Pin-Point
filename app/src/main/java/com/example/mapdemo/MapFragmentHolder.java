@@ -10,6 +10,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.BounceInterpolator;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.firebase.client.ChildEventListener;
@@ -17,28 +18,24 @@ import com.firebase.client.DataSnapshot;
 import com.firebase.client.Firebase;
 import com.firebase.client.FirebaseError;
 import com.firebase.client.Query;
-import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.maps.android.clustering.Cluster;
 import com.google.maps.android.clustering.ClusterManager;
 
-import java.lang.reflect.Array;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Map;
 
 /**
  * Created by alecksjohansson on 4/24/16.
  */
-public class MapFragmentHolder extends Fragment implements MyLocationListener {
+public class MapFragmentHolder extends Fragment implements MyLocationListener,GoogleMap.OnInfoWindowClickListener {
 
     private SupportMapFragment mMapFragment;
     private GoogleMap mMap;
@@ -71,17 +68,52 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener {
             });
         }
     }
+    public Police getPoliceInfo(Marker marker) {
+        Police police = new Police();
+        if (mPoliceList.size() > 0) {
+            for (Police po : mPoliceList) {
+                if (new LatLng(po.getLatitude(), po.getLongitude()).equals(marker.getPosition())) {
+                    police = po;
+                }
+            }
+        }
+        return police;
+    }
 
     protected void loadMap(GoogleMap googleMap) {
         mMap = googleMap;
         if (mMap != null) {
             // Map is ready
             Toast.makeText(getActivity(), "Map Fragment was loaded properly!", Toast.LENGTH_SHORT).show();
-            MapActivityPermissionsDispatcher.getMyLocationWithCheck((MapActivity)getActivity());
+            MapActivityPermissionsDispatcher.getMyLocationWithCheck((MapActivity) getActivity());
             mMap.getUiSettings().setMyLocationButtonEnabled(true);
             mMap.setMyLocationEnabled(true);
             Log.d("DEBUG", "enabled location");
             mMap.setOnMapLongClickListener((GoogleMap.OnMapLongClickListener) getContext());
+            googleMap.setInfoWindowAdapter(new GoogleMap.InfoWindowAdapter() {
+                @Override
+                public View getInfoWindow(Marker marker) {
+                    return null;
+                }
+
+                @Override
+                public View getInfoContents(Marker marker) {
+                    String dialog;
+                    Police police = getPoliceInfo(marker);
+                    dialog = ("     Seen: " + Police.getTimeAgo(police.getTimeInLong()) +
+                            "\n Can be charged for: " +
+                            "\n + Hit and run" +
+                            "\n + Turn without turn indicator" +
+                            "\n + Overspeed");
+                    View v = getLayoutInflater(null).inflate(R.layout.info_window_layout, null);
+                    TextView tvLat = (TextView) v.findViewById(R.id.tvLat);
+                    TextView tvLog = (TextView) v.findViewById(R.id.tvLog);
+                    tvLat.setText(dialog);
+                    tvLog.setText(" Like: " + police.getLike() +
+                            "\n Dislike: " + police.getDislike());
+                    return v;
+                }
+            });
             setUpClusterer();
         } else {
             Toast.makeText(getContext(), "Error - Map was null!!", Toast.LENGTH_SHORT).show();
@@ -89,8 +121,8 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener {
     }
 
     public void setUpClusterer() {
-         //nitialize the manager with the context and the map.
-                mClusterManager = new ClusterManager<Police>(getContext(), mMap);
+        //nitialize the manager with the context and the map.
+        mClusterManager = new ClusterManager<Police>(getContext(), mMap);
         mClusterManager.getClusterMarkerCollection().setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(Marker marker) {
@@ -109,29 +141,34 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener {
         // manager.
         mMap.setOnCameraChangeListener(mClusterManager);
         //mMap.setOnMarkerClickListener(mClusterManager);
-    mClusterManager.getMarkerCollection().getMarkers();
-       mMap.setOnMarkerClickListener((MapActivity) getActivity());
+        mClusterManager.getMarkerCollection().getMarkers();
+        mMap.setOnMarkerClickListener((MapActivity) getActivity());
+
     }
+
     public void writeToCloud(Police police) {
         mDb.push().setValue(police);
 
     }
+
     @Override
     public void onLocationUpdate(LatLng newPos) {
         if (mMap != null) {
-            mCurrentPosition =(newPos);
+            mCurrentPosition = (newPos);
         }
     }
+
     public void dropMarker(Police police) {
         BitmapDescriptor defaultMarker = BitmapDescriptorFactory
                 .defaultMarker(BitmapDescriptorFactory.HUE_RED);
         Marker marker = mMap.addMarker(new MarkerOptions().position(new LatLng(police.getLatitude(), police.getLongitude()))
                 .icon(defaultMarker).title("Police here").snippet("Seen " + Police.getTimeAgo(police.getTimeInLong())));
-    Log.d("RUNME","RUNME");
+        Log.d("RUNME", "RUNME");
         Log.d("LAT ", String.valueOf(police.getLatitude()));
-        Log.d("LONG",String.valueOf(police.getLongitude()));
+        Log.d("LONG", String.valueOf(police.getLongitude()));
         dropPinEffect(marker);
-   }
+    }
+
     public void onLocationChanged(Location location) {
         // Report to the UI that the location was updated
         String msg = "Updated Location: " +
@@ -141,6 +178,7 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener {
         //Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
 
     }
+
     private void dropPinEffect(final Marker marker) {
         // Handler allows us to repeat a code block after a specified delay
         final android.os.Handler handler = new android.os.Handler();
@@ -169,11 +207,12 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener {
                 } else { // done elapsing, show window
                     marker.showInfoWindow();
                 }
-               mClusterManager.cluster();
+                mClusterManager.cluster();
             }
         });
     }
-        @Override
+
+    @Override
     public void onMapLongClick(LatLng latLng) {
         Police police;
         if (useCurrent(latLng)) {
@@ -184,18 +223,20 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener {
         }
         writeToCloud(police);
         mClusterManager.addItem(police);
-            mPoliceList.add(police);
-  //      dropMarker(police);
+        mPoliceList.add(police);
+        //      dropMarker(police);
         mClusterManager.cluster();
     }
+
     public boolean useCurrent(LatLng clickPos) {
-        long distanceInMeter = Math.round(CalculationByDistance(mCurrentPosition, clickPos)*1000);
+        long distanceInMeter = Math.round(CalculationByDistance(mCurrentPosition, clickPos) * 1000);
         if (distanceInMeter > 80) {
             return true;
         } else {
             return false;
         }
     }
+
     public double CalculationByDistance(LatLng StartP, LatLng EndP) {
         int Radius = 6371;// radius of earth in Km
         double lat1 = StartP.latitude;
@@ -219,13 +260,14 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener {
                 + " Meter   " + meterInDec);
         return Radius * c;
     }
+
     public void readDatabase() {
         Query query = mDb.orderByChild("id");
         query.addChildEventListener(new ChildEventListener() {
             @Override
             public void onChildAdded(DataSnapshot dataSnapshot, String s) {
                 Police police = dataSnapshot.getValue(Police.class);
-             mClusterManager.addItem(police);
+                mClusterManager.addItem(police);
                 mPoliceList.add(police);
                 getPolice(mPoliceList);
                 mClusterManager.cluster();
@@ -254,16 +296,20 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener {
             }
         });
     }
-    public void getPolice(ArrayList<Police> mPoliceList){
 
-    {
-        for(int i = 0;i <mPoliceList.size() ;i++)
+    public void getPolice(ArrayList<Police> mPoliceList) {
+
         {
-            mPoliceList.get(i).getPosition();
-            Log.d("Police list","ABC"+mPoliceList);
+            for (int i = 0; i < mPoliceList.size(); i++) {
+                mPoliceList.get(i).getPosition();
+                Log.d("Police list", "ABC" + mPoliceList);
+            }
         }
     }
+
+
+    @Override
+    public void onInfoWindowClick(Marker marker) {
+
     }
-
-
 }

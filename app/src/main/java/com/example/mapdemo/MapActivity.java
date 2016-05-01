@@ -7,6 +7,7 @@ import android.content.IntentSender;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.support.design.widget.Snackbar;
 import android.support.design.widget.TabLayout;
 import android.support.v4.app.DialogFragment;
 import android.support.v4.app.Fragment;
@@ -15,6 +16,7 @@ import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
 import android.view.animation.BounceInterpolator;
 import android.widget.Toast;
 
@@ -158,13 +160,20 @@ public class MapActivity extends AppCompatActivity implements
         public CharSequence getPageTitle(int position) {
             switch (position) {
                 case 0:
-                    return "Easy Mode";
+                    return"Easy Mode";
                 case 1:
                     return "Map View";
                 default:
                     return null;
             }
         }
+    }
+    public void btnSeenPressed(View view){
+        Police police = new Police(mCurrentPosition);
+        mDb.push().setValue(police);
+    }
+    public void btnSeenUnseen(View view){
+
     }
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
