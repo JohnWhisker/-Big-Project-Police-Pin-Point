@@ -73,11 +73,12 @@ public class MapActivity extends AppCompatActivity implements
     private long UPDATE_INTERVAL = 60000;  /* 60 secs */
     private long FASTEST_INTERVAL = 5000; /* 5 secs */
     private Firebase mDb;
-    public LatLng getmCurrentPosition()
-    {
+
+    public LatLng getmCurrentPosition() {
 
         return mCurrentPosition;
     }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -120,20 +121,21 @@ public class MapActivity extends AppCompatActivity implements
             mEasyMode.onLocationUpdate(newPos);
             //Later, we can also call mEasyMode.onLocationUpdate(newPos) if we need.
         }
+
         public void writeToCloud(Police police) {
             mMapFragmentHolder.writeToCloud(police);
         }
-        public void onMapLongClick(LatLng latLng)
-        {
+
+        public void onMapLongClick(LatLng latLng) {
             mMapFragmentHolder.onMapLongClick(latLng);
-            Log.d("LATLNG","LATLNG"+latLng);
+            Log.d("LATLNG", "LATLNG" + latLng);
         }
-        public void setUpClusterer()
-        {
+
+        public void setUpClusterer() {
             mMapFragmentHolder.setUpClusterer();
         }
-        public void onLocationChanged(Location location)
-        {
+
+        public void onLocationChanged(Location location) {
             mMapFragmentHolder.onLocationChanged(location);
 
         }
@@ -160,7 +162,7 @@ public class MapActivity extends AppCompatActivity implements
         public CharSequence getPageTitle(int position) {
             switch (position) {
                 case 0:
-                    return"Easy Mode";
+                    return "Easy Mode";
                 case 1:
                     return "Map View";
                 default:
@@ -168,13 +170,16 @@ public class MapActivity extends AppCompatActivity implements
             }
         }
     }
-    public void btnSeenPressed(View view){
+
+    public void btnSeenPressed(View view) {
         Police police = new Police(mCurrentPosition);
         mDb.push().setValue(police);
     }
-    public void btnSeenUnseen(View view){
+
+    public void btnSeenUnseen(View view) {
 
     }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -272,7 +277,12 @@ public class MapActivity extends AppCompatActivity implements
     @Override
     public void onConnected(Bundle dataBundle) {
         // Display the connection status
-        Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+        Location location = new Location("");
+        try {
+            location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+        } catch (SecurityException e) {
+
+        }
         if (location != null) {
             Toast.makeText(this, "GPS location was found!", Toast.LENGTH_SHORT).show();
             LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
@@ -289,15 +299,15 @@ public class MapActivity extends AppCompatActivity implements
         mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
         mLocationRequest.setInterval(UPDATE_INTERVAL);
         mLocationRequest.setFastestInterval(FASTEST_INTERVAL);
-        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient,
-                mLocationRequest, this);
+        try {
+            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient,
+                    mLocationRequest, this);
+        } catch (SecurityException e) {
+        }
     }
 
     public void onLocationChanged(Location location) {
         // Report to the UI that the location was updated
-        String msg = "Updated Location: " +
-                Double.toString(location.getLatitude()) + "," +
-                Double.toString(location.getLongitude());
         mCurrentPosition = new LatLng(location.getLatitude(), location.getLongitude());
         //Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         mAdapter.onLocationUpdate(mCurrentPosition);
@@ -347,8 +357,7 @@ public class MapActivity extends AppCompatActivity implements
     }
 
 
-
-//
+    //
     private boolean isExis(LatLng latLng) {
         for (int i = 0; i < mPoliceList.size(); i++) {
             if (new LatLng(mPoliceList.get(i).getLatitude(), mPoliceList.get(i).getLongitude()).equals(latLng)) {
@@ -363,10 +372,12 @@ public class MapActivity extends AppCompatActivity implements
     public void onCameraChange(CameraPosition cameraPosition) {
 
     }
+
     public void writeToCloud(Police police) {
         mAdapter.writeToCloud(police);
 
     }
+
     @Override
     public void onMapLongClick(LatLng latLng) {
         mAdapter.onMapLongClick(latLng);

@@ -35,7 +35,7 @@ import java.util.ArrayList;
 /**
  * Created by alecksjohansson on 4/24/16.
  */
-public class MapFragmentHolder extends Fragment implements MyLocationListener,GoogleMap.OnInfoWindowClickListener {
+public class MapFragmentHolder extends Fragment implements MyLocationListener, GoogleMap.OnInfoWindowClickListener {
 
     private SupportMapFragment mMapFragment;
     private GoogleMap mMap;
@@ -68,6 +68,7 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener,Go
             });
         }
     }
+
     public Police getPoliceInfo(Marker marker) {
         Police police = new Police();
         if (mPoliceList.size() > 0) {
@@ -282,6 +283,10 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener,Go
 
             @Override
             public void onChildRemoved(DataSnapshot dataSnapshot) {
+                Police police = dataSnapshot.getValue(Police.class);
+                if (findMatch(police) != -1) {
+                    mPoliceList.remove(findMatch(police));
+                }
 
             }
 
@@ -297,12 +302,22 @@ public class MapFragmentHolder extends Fragment implements MyLocationListener,Go
         });
     }
 
+    public int findMatch(Police police) {
+        for (int i = 0; i < mPoliceList.size(); i++) {
+            if (police.equals(mPoliceList.get(i))) {
+                Log.d("FOUND IT",i+"");
+                return i;
+            }
+        }
+        return -1;
+    }
+
     public void getPolice(ArrayList<Police> mPoliceList) {
 
         {
             for (int i = 0; i < mPoliceList.size(); i++) {
                 mPoliceList.get(i).getPosition();
-                Log.d("Police list", "ABC" + mPoliceList);
+//                Log.d("Police list", "ABC" + mPoliceList);
             }
         }
     }

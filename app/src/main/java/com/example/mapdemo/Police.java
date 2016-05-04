@@ -54,18 +54,16 @@ public class Police implements ClusterItem {
         return new LatLng(latitude, longitude);
     }
 
-    public static long getDateInMillis(Date dateinput) {
+    public static long getDateInMillis(Date dateInput) {
         SimpleDateFormat format = new SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy");
 
-        long dateInMillis = 0;
         try {
-            Date mDate = format.parse("" + dateinput);
-            long timeInMilliseconds = mDate.getTime();
+            Date mDate = format.parse(String.valueOf(dateInput));
 
-            return timeInMilliseconds;
+            return mDate.getTime();
         } catch (ParseException e) {
-            Log.d("time", "Exception while parsing date. " + e.getMessage());
-            e.printStackTrace();
+
+
         }
 
         return 0;
@@ -150,7 +148,12 @@ public class Police implements ClusterItem {
 
     @Override
     public String toString() {
-        return "" + latitude + ":" + longitude + ":" + getDateInMillis(time);
+        try {
+            return "" + latitude + ":" + longitude + ":" + getDateInMillis(time);
+        } catch (Exception e) {
+
+        }
+        return "";
     }
 }
 
